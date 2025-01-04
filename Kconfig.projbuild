@@ -1,0 +1,69 @@
+menu "Example CoreMark Configuration"
+
+    # 编译优化等级参数
+    choice COMPILER_FLAGS
+        prompt "Compiler optimisation"
+        default O3
+        help 
+            Compiler optimization. For best CoreMark result select Turn on all.
+            Pratically this is a choice between -O3 and -O0.
+
+    config O3
+        bool "Turn on all(O3)"
+        help 
+            Compile Coremark with -O3
+    config O0
+        bool "Turn off all(O0)"
+        help 
+            Compile Coremark with -O0
+        
+    endchoice
+
+    # 迭代次数
+    config ITERATIONS
+        int "Number of iterations"
+        default 5000
+        range 5000 50000
+        help
+            Select a number of iteration which enable the test to run for 
+            more than 10s.
+
+    # 启动核心数（单核 或 多核）
+    config MULTI_THREADS    	
+        bool "Multi-Threads"
+        default n
+        help
+            Select the number of tasks to run in parallel.
+            if you want to use multi-thread, you can select
+            yes.
+    
+    # CPU频率
+    choice CPU_FREQUENCY
+        prompt "cpu frequency"
+        default ESP_DEFAULT_CPU_FREQ_MHZ_240
+        help
+          cpu frequency, 80MHz, 160MHz, 240MHz
+
+        config ESP_DEFAULT_CPU_FREQ_MHZ_80
+        bool "80MHz"
+        help
+          80MHz
+
+        config ESP_DEFAULT_CPU_FREQ_MHZ_160
+        bool "160MHz"
+        help
+          160MHz
+        
+        config ESP_DEFAULT_CPU_FREQ_MHZ_240
+        bool "240MHz"
+        help
+          240MHz
+
+    endchoice
+        
+    config OPTIMIZATION
+        string
+        default "-O3" if O3
+        default "-O0" if O0
+
+endmenu

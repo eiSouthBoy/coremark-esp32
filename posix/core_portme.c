@@ -23,6 +23,10 @@ Original Author: Shay Gal-on
 #include <valgrind/callgrind.h>
 #endif
 
+#if (MULTITHREAD > 1)
+static EventGroupHandle_t task_iterate_event_group;
+#endif
+
 #if (MEM_METHOD == MEM_MALLOC)
 /* Function: portable_malloc
         Provide malloc() functionality in a platform specific way.
@@ -216,6 +220,18 @@ portable_init(core_portable *p, int *argc, char *argv[])
     }
 #endif
 
+#if (SEED_METHOD == SEED_VOLATILE)
+#if VALIDATION_RUN
+    ee_printf("--> VALIDATION_RUN\n");
+#endif
+#if PERFORMANCE_RUN
+    ee_printf("--> PERFORMANCE_RUN\n");
+#endif
+#if PROFILE_RUN
+    ee_printf("--> PROFILE_RUN\n");
+#endif
+#endif
+
     (void)argc; // prevent unused warning
     (void)argv; // prevent unused warning
     
@@ -232,6 +248,10 @@ portable_init(core_portable *p, int *argc, char *argv[])
 #if (MAIN_HAS_NOARGC && (SEED_METHOD == SEED_ARG))
     ee_printf(
         "ERROR! Main has no argc, but SEED_METHOD defined to SEED_ARG!\n");
+#endif
+
+#if (MULTITHREAD > 1)
+    task_iterate_event_group = xEventGroupCreate();
 #endif
 
 #if (MULTITHREAD > 1) && (SEED_METHOD == SEED_ARG)
@@ -278,18 +298,63 @@ portable_fini(core_portable *p)
    MCAPI or other standards can easily be devised.
 */
 #if USE_PTHREAD
+// ee_u8
+// core_start_parallel(core_results *res)
+// {
+//     return (ee_u8)pthread_create(
+//         &(res->port.thread), NULL, iterate, (void *)res);
+// }
+// ee_u8
+// core_stop_parallel(core_results *res)
+// {
+//     void *retval;
+//     return (ee_u8)pthread_join(res->port.thread, &retval);
+// }
+
+
+void iterate_task(void *param)
+{
+    core_results *res = (core_results *)param;
+    
+    iterate(res);
+
+    xEventGroupSetBits(*(res->port.event_group), res->port.event_bit);
+
+    vTaskDelete(NULL);
+}
+
+#define SIZE_NAME 16
+
 ee_u8
 core_start_parallel(core_results *res)
 {
-    return (ee_u8)pthread_create(
-        &(res->port.thread), NULL, iterate, (void *)res);
+    static BaseType_t core = 0;
+    char name[SIZE_NAME + 1] = {0};
+
+    snprintf(name, SIZE_NAME, "iterate-%d", core);
+    
+    res->port.event_bit = (1 << core);
+    res->port.event_group = &task_iterate_event_group;
+
+    xTaskCreatePinnedToCore(iterate_task, name, 8192, res, 1, NULL, core);
+
+    core += 1;
+
+    return 1;
 }
+
 ee_u8
 core_stop_parallel(core_results *res)
 {
-    void *retval;
-    return (ee_u8)pthread_join(res->port.thread, &retval);
+    xEventGroupWaitBits(*(res->port.event_group), 
+                        res->port.event_bit, 
+                        false, 
+                        false, 
+                        120000 / portTICK_PERIOD_MS);
+
+    return 1;
 }
+
 #elif USE_FORK
 static int key_id = 0;
 ee_u8

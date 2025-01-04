@@ -24,6 +24,24 @@ Original Author: Shay Gal-on
 #define CORE_PORTME_H
 
 #include "core_portme_posix_overrides.h"
+#include "../../../build/config/sdkconfig.h"
+#define COMPILER_FLAGS  CONFIG_OPTIMIZATION   // 编译优化等级
+
+#ifdef CONFIG_MULTI_THREADS
+#define MULTITHREAD     2
+#define USE_PTHREAD     1
+#endif
+
+#define MAIN_HAS_NOARGC 1
+
+#define ITERATIONS      CONFIG_ITERATIONS
+#define SEED_METHOD     SEED_VOLATILE
+
+#if (MULTITHREAD > 1)
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+#endif
 
 /************************/
 /* Data types and settings */
@@ -284,6 +302,11 @@ typedef struct CORE_PORTABLE_S
 #if (MULTITHREAD > 1)
 #if USE_PTHREAD
     pthread_t thread;
+
+    TaskHandle_t handle;
+    ee_u32 event_bit;
+    EventGroupHandle_t *event_group;
+
 #elif USE_FORK
     pid_t pid;
     int   shmid;
